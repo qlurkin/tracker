@@ -113,7 +113,7 @@ main :: proc() {
 
 		rl.DrawText("Hello Tracker !", 10, 10, 40, rl.WHITE)
 
-		msg := strings.clone_to_cstring(fmt.tprintf("Frequency: {}", tracker.oscillator.frequency), allocator=context.temp_allocator)
+		msg := fmt.caprintf("Frequency: {}", tracker.oscillator.frequency, allocator=context.temp_allocator)
 		rl.DrawText(msg, 10, 60, 40, rl.WHITE)
 
 		// rl.DrawText("00", 10, 60, 40, rl.WHITE)

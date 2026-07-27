@@ -128,7 +128,8 @@ process :: proc(tracker: ^Tracker, f: Frame) -> Frame {
 }
 
 synthesize :: proc(tracker: ^Tracker) -> Frame {
-	s := square(&tracker.oscillator)
+	s := next_band_limited_square(&tracker.oscillator)
+	//s := next_square(&tracker.oscillator)
 	f := pan(s, 0.5)
 	f = process(tracker, f)
 	return f
