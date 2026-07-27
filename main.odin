@@ -6,6 +6,7 @@ import "core:mem"
 import ma "vendor:miniaudio"
 import rl "vendor:raylib"
 
+SAMPLE_RATE: u32 = 48000
 
 Window :: struct {
 	name:          cstring,
@@ -15,34 +16,9 @@ Window :: struct {
 	control_flags: rl.ConfigFlags,
 }
 
-Oscillator :: struct {
-	phase:           u32,
-	phase_increment: u32,
-}
-
-
-Frame :: struct {
-	left:  [dynamic]f32,
-	right: [dynamic]f32,
-}
-
-
-oscillator_buffer: Frame
-
-
-make_oscillator :: proc(frequency: f32, sample_rate: u32) -> Oscillator {
-	return Oscillator {
-		phase = 0,
-		phase_increment = u32(f64(frequency) * (4294967296 / f64(sample_rate))),
-	}
-}
-
-square :: proc(oscillator: ^Oscillator, frame: Frame) {
-	frame_count := u32(len(frame.left))
-	oscillator^.phase = oscillator^.phase + frame_count * oscillator^.phase_increment
-}
 
 custom_context: rt.Context
+tracker :^Tracker
 
 data_callback :: proc "c" (
 	pDevice: ^ma.device,
@@ -51,7 +27,16 @@ data_callback :: proc "c" (
 	frame_count: u32,
 ) {
 	context = custom_context
-	fmt.println(frame_count)
+
+	ptr := cast([^]f32) pOutput
+	output := ptr[:frame_count*2]
+
+	f: Frame
+	for i in 0..<frame_count {
+		f = synthesize(tracker)
+		output[i*2] = f[0]
+		output[i*2+1] = f[1]
+	}
 }
 
 
@@ -77,11 +62,6 @@ main :: proc() {
 
 	fmt.println("Hello Tracker!")
 
-	x := new(int)
-
-	x^ = 42
-
-
 	window := Window{"Tracker", 1200, 800, 60, rl.ConfigFlags{.WINDOW_RESIZABLE}}
 
 	rl.InitWindow(window.width, window.height, window.name)
@@ -96,7 +76,7 @@ main :: proc() {
 	config := ma.device_config_init(ma.device_type.playback)
 	config.playback.format = ma.format.f32
 	config.playback.channels = 2
-	config.sampleRate = 48000
+	config.sampleRate = SAMPLE_RATE
 	config.dataCallback = data_callback
 
 	device: ma.device
@@ -106,11 +86,9 @@ main :: proc() {
 		return
 	}
 
-	oscillator_buffer = Frame {
-		left  = make([dynamic]f32, 480),
-		right = make([dynamic]f32, 480),
-	}
 
+
+	tracker = make_tracker()
 
 	ma.device_start(&device)
 
@@ -137,5 +115,5 @@ main :: proc() {
 
 	ma.device_uninit(&device)
 
-	free(x)
+	free(tracker)
 }
