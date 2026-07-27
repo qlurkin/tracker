@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:mem"
 import ma "vendor:miniaudio"
 import rl "vendor:raylib"
+import "core:strings"
 
 SAMPLE_RATE: u32 = 48000
 
@@ -44,8 +45,11 @@ main :: proc() {
 	when ODIN_DEBUG {
 		fmt.println("DEBUG MODE")
 		track: mem.Tracking_Allocator
+		tmp_track: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&track, context.allocator)
+		mem.tracking_allocator_init(&tmp_track, context.temp_allocator)
 		context.allocator = mem.tracking_allocator(&track)
+		context.temp_allocator = mem.tracking_allocator(&tmp_track)
 
 		defer {
 			if len(track.allocation_map) > 0 {
@@ -55,6 +59,14 @@ main :: proc() {
 				}
 			}
 			mem.tracking_allocator_destroy(&track)
+
+			if len(tmp_track.allocation_map) > 0 {
+				fmt.eprintf("=== %v temporary allocations not freed: ===\n", len(tmp_track.allocation_map))
+				for _, entry in tmp_track.allocation_map {
+					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+				}
+			}
+			mem.tracking_allocator_destroy(&tmp_track)
 		}
 	}
 
@@ -86,8 +98,6 @@ main :: proc() {
 		return
 	}
 
-
-
 	tracker = make_tracker()
 
 	ma.device_start(&device)
@@ -102,15 +112,20 @@ main :: proc() {
 		rl.ClearBackground(rl.BLACK)
 
 		rl.DrawText("Hello Tracker !", 10, 10, 40, rl.WHITE)
-		rl.DrawText("00", 10, 60, 40, rl.WHITE)
-		rl.DrawText("11", 10, 100, 40, rl.WHITE)
-		rl.DrawText("--", 10, 140, 40, rl.WHITE)
-		rl.DrawText("FF", 10, 180, 40, rl.WHITE)
-		rl.DrawTextEx(font, "FF", rl.Vector2{10, 220}, 40, 0, rl.WHITE)
-		rl.DrawTextEx(font, "11", rl.Vector2{10, 260}, fontsize, 0, rl.WHITE)
+
+		msg := strings.clone_to_cstring(fmt.tprintf("Frequency: {}", tracker.oscillator.frequency), allocator=context.temp_allocator)
+		rl.DrawText(msg, 10, 60, 40, rl.WHITE)
+
+		// rl.DrawText("00", 10, 60, 40, rl.WHITE)
+		// rl.DrawText("11", 10, 100, 40, rl.WHITE)
+		// rl.DrawText("--", 10, 140, 40, rl.WHITE)
+		// rl.DrawText("FF", 10, 180, 40, rl.WHITE)
+		// rl.DrawTextEx(font, "FF", rl.Vector2{10, 220}, 40, 0, rl.WHITE)
+		// rl.DrawTextEx(font, "11", rl.Vector2{10, 260}, fontsize, 0, rl.WHITE)
 
 
 		rl.EndDrawing()
+		free_all(context.temp_allocator)
 	}
 
 	ma.device_uninit(&device)

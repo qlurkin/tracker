@@ -1,6 +1,7 @@
 package tracker
 
 Oscillator :: struct {
+	frequency:       f32,
 	phase:           u32,
 	phase_increment: u32,
 }
@@ -8,6 +9,7 @@ Oscillator :: struct {
 
 make_oscillator :: proc(frequency: f32) -> Oscillator {
 	return Oscillator {
+		frequency = frequency,
 		phase = 0,
 		phase_increment = u32(f64(frequency) * (4294967296 / f64(SAMPLE_RATE))),
 	}
@@ -18,8 +20,7 @@ square :: proc(oscillator: ^Oscillator) -> f32 {
 	res: f32
 	if oscillator.phase < 2147483648 {
 		res = -1
-	}
-	else {
+	} else {
 		res = 1
 	}
 	return res
