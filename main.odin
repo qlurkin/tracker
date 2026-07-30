@@ -3,9 +3,9 @@ package tracker
 import rt "base:runtime"
 import "core:fmt"
 import "core:mem"
+import "core:strings"
 import ma "vendor:miniaudio"
 import rl "vendor:raylib"
-import "core:strings"
 
 SAMPLE_RATE: u32 = 48000
 
@@ -19,7 +19,7 @@ Window :: struct {
 
 
 custom_context: rt.Context
-tracker :^Tracker
+tracker: ^Tracker
 
 data_callback :: proc "c" (
 	pDevice: ^ma.device,
@@ -29,14 +29,14 @@ data_callback :: proc "c" (
 ) {
 	context = custom_context
 
-	ptr := cast([^]f32) pOutput
-	output := ptr[:frame_count*2]
+	ptr := cast([^]f32)pOutput
+	output := ptr[:frame_count * 2]
 
 	f: Frame
-	for i in 0..<frame_count {
+	for i in 0 ..< frame_count {
 		f = synthesize(tracker)
-		output[i*2] = f[0]
-		output[i*2+1] = f[1]
+		output[i * 2] = f[0]
+		output[i * 2 + 1] = f[1]
 	}
 }
 
@@ -61,7 +61,10 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 
 			if len(tmp_track.allocation_map) > 0 {
-				fmt.eprintf("=== %v temporary allocations not freed: ===\n", len(tmp_track.allocation_map))
+				fmt.eprintf(
+					"=== %v temporary allocations not freed: ===\n",
+					len(tmp_track.allocation_map),
+				)
 				for _, entry in tmp_track.allocation_map {
 					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
 				}
@@ -74,16 +77,16 @@ main :: proc() {
 
 	fmt.println("Hello Tracker!")
 
-	window := Window{"Tracker", 1200, 800, 60, rl.ConfigFlags{.WINDOW_RESIZABLE}}
+	window := Window{"Tracker", 1280, 800, 60, rl.ConfigFlags{.WINDOW_RESIZABLE}}
 
 	rl.InitWindow(window.width, window.height, window.name)
 	rl.SetWindowState(window.control_flags)
 	rl.SetTargetFPS(window.fps)
 
-	fontsize: f32 = 64
+	fontsize: i32 = 24
 	scale := rl.GetWindowScaleDPI()
 
-	font := rl.LoadFontEx("JetBrainsMonoNerdFont-Regular.ttf", i32(scale.x * fontsize), nil, 0)
+	//font := rl.LoadFontEx("JetBrainsMonoNerdFont-Regular.ttf", i32(scale.x * fontsize), nil, 0)
 
 	config := ma.device_config_init(ma.device_type.playback)
 	config.playback.format = ma.format.f32
@@ -102,6 +105,8 @@ main :: proc() {
 
 	ma.device_start(&device)
 
+	compute_offsets()
+
 	for !rl.WindowShouldClose() {
 		if rl.IsWindowResized() {
 			window.width = rl.GetScreenWidth()
@@ -111,18 +116,7 @@ main :: proc() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.BLACK)
 
-		rl.DrawText("Hello Tracker !", 10, 10, 40, rl.WHITE)
-
-		msg := fmt.caprintf("Frequency: {}", tracker.oscillator.frequency, allocator=context.temp_allocator)
-		rl.DrawText(msg, 10, 60, 40, rl.WHITE)
-
-		// rl.DrawText("00", 10, 60, 40, rl.WHITE)
-		// rl.DrawText("11", 10, 100, 40, rl.WHITE)
-		// rl.DrawText("--", 10, 140, 40, rl.WHITE)
-		// rl.DrawText("FF", 10, 180, 40, rl.WHITE)
-		// rl.DrawTextEx(font, "FF", rl.Vector2{10, 220}, 40, 0, rl.WHITE)
-		// rl.DrawTextEx(font, "11", rl.Vector2{10, 260}, fontsize, 0, rl.WHITE)
-
+		ui(rl.Rectangle{0, 0, f32(window.width), f32(window.height)}, tracker)
 
 		rl.EndDrawing()
 		free_all(context.temp_allocator)

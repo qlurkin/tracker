@@ -16,46 +16,46 @@ Memory :: struct {
 }
 
 Tracker :: struct {
-	highpass: [2]Biquad,
-	lowpass:  [2]Biquad,
-	memory:   Memory,
+	highpass:   [2]Biquad,
+	lowpass:    [2]Biquad,
+	memory:     Memory,
 	oscillator: Oscillator,
 }
 
 // arg goes between 0 and 1 (from left to right)
 pan :: proc(x: f32, arg: f32) -> Frame {
-	return Frame{x * math.sqrt(1-arg), x * math.sqrt(arg)}
+	return Frame{x * math.sqrt(1 - arg), x * math.sqrt(arg)}
 }
 
 make_lowpass :: proc(cutoff: f32) -> Biquad {
-	w0 := 2*math.PI*cutoff/f32(SAMPLE_RATE)
+	w0 := 2 * math.PI * cutoff / f32(SAMPLE_RATE)
 	c := math.cos(w0)
 	s := math.sin(w0)
-	a := s*math.sqrt(f32(2))/2
+	a := s * math.sqrt(f32(2)) / 2
 	a0 := 1 + a
 
 	return Biquad {
-		b0 = (1-c)/2/a0,
-		b1 = (1-c)/a0,
-		b2 = (1-c)/2/a0,
-		a1 = -2*c/a0,
-		a2 = (1 - a)/a0,
+		b0 = (1 - c) / 2 / a0,
+		b1 = (1 - c) / a0,
+		b2 = (1 - c) / 2 / a0,
+		a1 = -2 * c / a0,
+		a2 = (1 - a) / a0,
 	}
 }
 
 make_highpass :: proc(cutoff: f32) -> Biquad {
-	w0 := 2*math.PI*cutoff/f32(SAMPLE_RATE)
+	w0 := 2 * math.PI * cutoff / f32(SAMPLE_RATE)
 	c := math.cos(w0)
 	s := math.sin(w0)
-	a := s*math.sqrt(f32(2))/2
+	a := s * math.sqrt(f32(2)) / 2
 	a0 := 1 + a
 
 	return Biquad {
-		b0 = (1+c)/2/a0,
-		b1 = -(1+c)/a0,
-		b2 = (1+c)/2/a0,
-		a1 = -2*c/a0,
-		a2 = (1 - a)/a0,
+		b0 = (1 + c) / 2 / a0,
+		b1 = -(1 + c) / a0,
+		b2 = (1 + c) / 2 / a0,
+		a1 = -2 * c / a0,
+		a2 = (1 - a) / a0,
 	}
 }
 
@@ -83,7 +83,7 @@ process_biquad_mono :: proc(bq: ^Biquad, x: f32) -> f32 {
 
 process_biquad_stereo :: proc(bq: ^[2]Biquad, f: Frame) -> Frame {
 	res: Frame
-	for i in 0..<2 {
+	for i in 0 ..< 2 {
 		res[i] = process_biquad_mono(&bq[i], f[i])
 	}
 	return res
@@ -97,7 +97,7 @@ process_biquad :: proc {
 
 process_numeric_protection :: proc(memory: ^Memory, f: Frame) -> Frame {
 	res: Frame
-	for i in 0..<2 {
+	for i in 0 ..< 2 {
 		x := f[i]
 		if math.is_nan(x) || math.is_inf(x) {
 			x = memory.value[i]
@@ -110,7 +110,7 @@ process_numeric_protection :: proc(memory: ^Memory, f: Frame) -> Frame {
 
 process_limiter :: proc(f: Frame) -> Frame {
 	res: Frame
-	for i in 0..<2 {
+	for i in 0 ..< 2 {
 		res[i] = f[i] / (1 + math.abs(f[i]))
 	}
 	return res

@@ -10,17 +10,17 @@ poly_blep :: proc(osc: Oscillator, shift: u32 = 0) -> f32 {
 	t := f32(osc.phase + shift) / 4294967296
 	dt := f32(osc.phase_increment) / 4294967296
 
-    if t < dt {
-        x := t / dt
-        return x + x - x*x - 1.0
-    }
+	if t < dt {
+		x := t / dt
+		return x + x - x * x - 1.0
+	}
 
-    if t > 1.0 - dt {
-        x := (t - 1.0) / dt
-        return x*x + x + x + 1.0
-    }
+	if t > 1.0 - dt {
+		x := (t - 1.0) / dt
+		return x * x + x + x + 1.0
+	}
 
-    return 0.0
+	return 0.0
 }
 
 
