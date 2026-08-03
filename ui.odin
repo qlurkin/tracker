@@ -6,7 +6,7 @@ import rl "vendor:raylib"
 
 hex_digits := "0123456789ABCDEF-"
 
-FONT_SIZE: f32 = 24
+FONT_SIZE: f32 = 20
 DECIMAL_OFFSET: f32
 ONE_OFFSET: f32
 DASH_OFFSET: f32
@@ -25,6 +25,7 @@ compute_offsets :: proc() {
 	DIGIT_WIDTH = (a_size)
 	GAP = aa_size - 2 * a_size
 }
+
 
 hex_digit :: proc(x: f32, y: f32, value: u8, color: rl.Color = rl.WHITE) {
 	offset: f32 = 0
@@ -45,22 +46,39 @@ hex_digit :: proc(x: f32, y: f32, value: u8, color: rl.Color = rl.WHITE) {
 	)
 }
 
-hex_input :: proc(x: f32, y: f32, value: u8, color: rl.Color = rl.WHITE) {
-	most := value / 16
-	least := value % 16
-	hex_digit(x, y, most, color)
-	hex_digit(x + DIGIT_WIDTH + GAP, y, least, color)
+Hex :: union {
+	u8,
 }
 
-label :: proc(x, y: f32, text: string, color: rl.Color = rl.WHITE) {
+hex_input :: proc(value: Hex, color: rl.Color = rl.WHITE) {
+	layout := current_layout()
+	x := layout.cursor.x
+	y := layout.cursor.y
+	switch v in value {
+	case u8:
+		most := v / 16
+		least := v % 16
+		hex_digit(x, y, most, color)
+		hex_digit(x + DIGIT_WIDTH + GAP, y, least, color)
+	case nil:
+		hex_digit(x, y, 16, color)
+		hex_digit(x + DIGIT_WIDTH + GAP, y, 16, color)
+	}
+	finish_widget(DIGIT_WIDTH * 2 + GAP, FONT_SIZE)
+}
+
+label :: proc(text: string, color: rl.Color = rl.WHITE) {
 	text := strings.clone_to_cstring(text, allocator = context.temp_allocator)
-	rl.DrawTextEx(rl.GetFontDefault(), text, rl.Vector2{x, y}, FONT_SIZE, GAP, color)
+	width := rl.MeasureText(text, i32(FONT_SIZE))
+	layout := current_layout()
+	rl.DrawTextEx(rl.GetFontDefault(), text, layout.cursor, FONT_SIZE, GAP, color)
+	finish_widget(f32(width), FONT_SIZE)
 }
 
-frame :: proc(area: rl.Rectangle, title: string) -> rl.Rectangle {
+draw_frame :: proc(area: rl.Rectangle, title: string) -> rl.Rectangle {
 	title := strings.clone_to_cstring(title, allocator = context.temp_allocator)
 	title_width := rl.MeasureText(title, i32(FONT_SIZE))
-	xpos := area.x + (area.width - f32(title_width) - DIGIT_WIDTH) / 2
+	xpos := area.x + (area.width - f32(title_width)) / 2
 	rl.DrawTextEx(rl.GetFontDefault(), title, rl.Vector2{xpos, area.y}, FONT_SIZE, GAP, rl.RED)
 	top := area.y + FONT_SIZE / 2
 	bottom := area.y + area.height - FONT_SIZE / 2
@@ -82,11 +100,39 @@ frame :: proc(area: rl.Rectangle, title: string) -> rl.Rectangle {
 	}
 }
 
-ui :: proc(area: rl.Rectangle, tracker: ^Tracker) {
-	frame(area, "Hello Tracker !")
-	label(10, 60, fmt.tprintf("Frequency: {}", tracker.oscillator.frequency))
+begin_frame :: proc(
+	flow: Flow = Flow.Vertical,
+	width: f32 = 0,
+	height: f32 = 0,
+	padding: Padding = Padding{},
+) {
+	push_layout(
+		flow,
+		width,
+		height,
+		Padding {
+			FONT_SIZE + padding.top,
+			DIGIT_WIDTH + padding.right,
+			FONT_SIZE + padding.bottom,
+			DIGIT_WIDTH + padding.left,
+		},
+	)
+}
 
+end_frame :: proc(title: string) {
+	layout := current_layout()
+	frame_rect := outside_rect(layout^)
+	draw_frame(frame_rect, title)
+	pop_layout()
+}
+
+ui :: proc(area: rl.Rectangle, tracker: ^Tracker) {
+	begin_layout(area)
+	begin_frame(width = layout_width_percent(100), height = layout_height_percent(100))
+	label(fmt.tprintf("Frequency: {}", tracker.oscillator.frequency))
 	for i in 0 ..= 16 {
-		hex_input(10, 100 + f32(i) * FONT_SIZE, u8(i) + 200)
+		hex_input(u8(i) + 200)
 	}
+	end_frame("Tracker")
+	end_layout()
 }

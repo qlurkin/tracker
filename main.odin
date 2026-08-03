@@ -107,6 +107,7 @@ main :: proc() {
 
 	compute_offsets()
 
+
 	for !rl.WindowShouldClose() {
 		if rl.IsWindowResized() {
 			window.width = rl.GetScreenWidth()
@@ -121,6 +122,8 @@ main :: proc() {
 		rl.EndDrawing()
 		free_all(context.temp_allocator)
 	}
+
+	delete_layout()
 
 	ma.device_uninit(&device)
 
