@@ -103,6 +103,10 @@ main :: proc() {
 
 	tracker = make_tracker()
 
+	set_note(tracker, 69)
+	fmt.println(note_frequency(0))
+	fmt.println(note_frequency(127))
+
 	ma.device_start(&device)
 
 	compute_offsets()
@@ -118,6 +122,60 @@ main :: proc() {
 		rl.ClearBackground(rl.BLACK)
 
 		ui(rl.Rectangle{0, 0, f32(window.width), f32(window.height)}, tracker)
+
+		// for i in 32 ..< 72 {
+		// 	rl.DrawText(
+		// 		fmt.caprint(i, allocator = context.temp_allocator),
+		// 		10,
+		// 		i32(f32(i - 32) * FONT_SIZE),
+		// 		i32(FONT_SIZE),
+		// 		rl.GRAY,
+		// 	)
+		// 	rl.DrawTextCodepoint(
+		// 		rl.GetFontDefault(),
+		// 		rune(i),
+		// 		rl.Vector2{50, f32(i - 32) * FONT_SIZE},
+		// 		FONT_SIZE,
+		// 		rl.WHITE,
+		// 	)
+		// }
+
+		// for i in 72 ..< 112 {
+		// 	rl.DrawText(
+		// 		fmt.caprint(i, allocator = context.temp_allocator),
+		// 		100,
+		// 		i32(f32(i - 72) * FONT_SIZE),
+		// 		i32(FONT_SIZE),
+		// 		rl.GRAY,
+		// 	)
+		// 	r := u8(i)
+		// 	s := string([]u8{r})
+		// 	draw_monospaced_text(150, f32(i - 72) * FONT_SIZE, s)
+		// 	// rl.DrawTextCodepoint(
+		// 	// 	rl.GetFontDefault(),
+		// 	// 	rune(i),
+		// 	// 	rl.Vector2{150, f32(i - 72) * FONT_SIZE},
+		// 	// 	FONT_SIZE,
+		// 	// 	rl.WHITE,
+		// 	// )
+		// }
+
+		// for i in 112 ..< 152 {
+		// 	rl.DrawText(
+		// 		fmt.caprint(i, allocator = context.temp_allocator),
+		// 		200,
+		// 		i32(f32(i - 112) * FONT_SIZE),
+		// 		i32(FONT_SIZE),
+		// 		rl.GRAY,
+		// 	)
+		// 	rl.DrawTextCodepoint(
+		// 		rl.GetFontDefault(),
+		// 		rune(i),
+		// 		rl.Vector2{250, f32(i - 112) * FONT_SIZE},
+		// 		FONT_SIZE,
+		// 		rl.WHITE,
+		// 	)
+		// }
 
 		rl.EndDrawing()
 		free_all(context.temp_allocator)

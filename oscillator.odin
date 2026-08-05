@@ -24,12 +24,15 @@ poly_blep :: proc(osc: Oscillator, shift: u32 = 0) -> f32 {
 }
 
 
-make_oscillator :: proc(frequency: f32) -> Oscillator {
-	return Oscillator {
-		frequency = frequency,
-		phase = 0,
-		phase_increment = u32(f64(frequency) * (4294967296 / f64(SAMPLE_RATE))),
-	}
+make_oscillator :: proc(frequency: f32 = 440) -> Oscillator {
+	res := Oscillator{}
+	set_frequency(&res, frequency)
+	return res
+}
+
+set_frequency :: proc(oscillator: ^Oscillator, frequency: f32) {
+	oscillator.frequency = frequency
+	oscillator.phase_increment = u32(f64(frequency) * (4294967296 / f64(SAMPLE_RATE)))
 }
 
 increment :: proc(oscillator: ^Oscillator) {

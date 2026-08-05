@@ -1,5 +1,6 @@
 package tracker
 
+import "core:fmt"
 import "core:math"
 
 Frame :: distinct [2]f32
@@ -16,10 +17,15 @@ Memory :: struct {
 }
 
 Tracker :: struct {
-	highpass:   [2]Biquad,
-	lowpass:    [2]Biquad,
-	memory:     Memory,
-	oscillator: Oscillator,
+	highpass:        [2]Biquad,
+	lowpass:         [2]Biquad,
+	memory:          Memory,
+	oscillator:      Oscillator,
+	note:            u8,
+	bpm:             u8,
+	phrase:          [16]u8,
+	samples_in_tick: u32,
+	cursor:          PhraseCursor,
 }
 
 // arg goes between 0 and 1 (from left to right)
@@ -59,13 +65,21 @@ make_highpass :: proc(cutoff: f32) -> Biquad {
 	}
 }
 
+set_note :: proc(tracker: ^Tracker, note: u8) {
+	tracker.note = note
+	set_frequency(&tracker.oscillator, note_frequency(note))
+}
+
 make_tracker :: proc() -> ^Tracker {
 	res := new(Tracker)
-	res.oscillator = make_oscillator(440)
+	res.oscillator = make_oscillator()
 	res.highpass[0] = make_highpass(20)
 	res.highpass[1] = res.highpass[0]
 	res.lowpass[0] = make_lowpass(18000)
 	res.lowpass[1] = res.lowpass[0]
+	res.bpm = 128
+	res.phrase = [16]u8{60, 255, 255, 255, 60, 255, 255, 255, 60, 255, 255, 255, 60, 255, 255, 255}
+	set_note(res, 69)
 	return res
 }
 
@@ -127,10 +141,45 @@ process :: proc(tracker: ^Tracker, f: Frame) -> Frame {
 	return res
 }
 
+tick :: proc(tracker: ^Tracker) {
+	update_phrase_cursor(tracker)
+}
+
+update_tick :: proc(tracker: ^Tracker) {
+	spt := samples_per_tick(tracker.bpm)
+	tracker.samples_in_tick += 1
+	if tracker.samples_in_tick == spt {
+		tracker.samples_in_tick = 0
+		tick(tracker)
+	}
+}
+
 synthesize :: proc(tracker: ^Tracker) -> Frame {
+	update_tick(tracker)
 	s := next_band_limited_square(&tracker.oscillator)
-	//s := next_square(&tracker.oscillator)
 	f := pan(s, 0.5)
 	f = process(tracker, f)
 	return f
+}
+
+step :: proc(tracker: ^Tracker) {
+
+}
+
+PhraseCursor :: struct {
+	step: u8,
+	tick: u32,
+}
+
+update_phrase_cursor :: proc(tracker: ^Tracker) {
+	tps := PPQ / 4
+	tracker.cursor.tick += 1
+	if tracker.cursor.tick == tps {
+		tracker.cursor.tick = 0
+		tracker.cursor.step += 1
+	}
+	if tracker.cursor.step == 16 {
+		tracker.cursor.step = 0
+	}
+	step(tracker)
 }

@@ -131,7 +131,7 @@ finish_widget :: proc(width, height: f32) {
 		layout.cursor.y = layout.area.y + layout.height
 		layout.cursor.x = layout.area.x
 	case Flow.Horizontal:
-		layout.cursor.x = layout.area.x + layout.width + DIGIT_WIDTH
+		layout.cursor.x = layout.area.x + layout.width
 		layout.cursor.y = layout.area.y
 	}
 }
@@ -148,4 +148,14 @@ layout_width_percent :: proc(value: f32) -> f32 {
 layout_height_percent :: proc(value: f32) -> f32 {
 	layout := current_layout()
 	return layout.area.height * value / 100
+}
+
+remaining_height_percent :: proc(value: f32) -> f32 {
+	layout := current_layout()
+	return (layout.area.height - (layout.cursor.y - layout.area.y)) * value / 100
+}
+
+remaining_width_percent :: proc(value: f32) -> f32 {
+	layout := current_layout()
+	return (layout.area.width - (layout.cursor.x - layout.area.x)) * value / 100
 }
