@@ -101,10 +101,6 @@ main :: proc() {
 
 	tracker = make_tracker()
 
-
-	fmt.println(note_frequency(0))
-	fmt.println(note_frequency(127))
-
 	ma.device_start(&device)
 
 	compute_offsets()
