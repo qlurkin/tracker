@@ -1,5 +1,6 @@
 package tracker
 
+import "core:fmt"
 import "core:math"
 
 Transition :: struct {
@@ -82,11 +83,12 @@ next_ads :: proc(ads: ^Ads) -> f32 {
 }
 
 SimpleSynth :: struct {
-	attack:  f32,
-	decay:   f32,
-	sustain: f32,
-	release: f32,
-	hold:    f32,
+	waveform: Waveform,
+	attack:   f32,
+	decay:    f32,
+	sustain:  f32,
+	release:  f32,
+	hold:     f32,
 }
 
 Voice :: struct {
@@ -111,7 +113,10 @@ next_voice :: proc(voice: ^Voice) -> f32 {
 	if voice.ads.samples == voice.hold {
 		voice.release.released = true
 	}
-	res := 0.25 * next_band_limited_square(&voice.oscillator)
+
+	p := WaveformProcs
+
+	res := 0.25 * p[voice.synth.waveform](&voice.oscillator)
 	env := next_ads(&voice.ads)
 	rel := next_release(&voice.release)
 	return env * res * rel

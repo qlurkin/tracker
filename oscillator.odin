@@ -1,9 +1,13 @@
 package tracker
 
+import "core:fmt"
+import "core:math"
+
 Oscillator :: struct {
 	frequency:       f32,
 	phase:           u32,
 	phase_increment: u32,
+	prev_output:     f32, // Only used for band limited triangle
 }
 
 poly_blep :: proc(osc: Oscillator, shift: u32 = 0) -> f32 {
@@ -65,3 +69,70 @@ next_band_limited_square :: proc(oscillator: ^Oscillator) -> f32 {
 	increment(oscillator)
 	return band_limited_square(oscillator^)
 }
+
+saw :: proc(oscillator: Oscillator) -> f32 {
+	return 2.0 * f32(oscillator.phase) / 4294967296.0 - 1.0
+}
+
+next_saw :: proc(oscillator: ^Oscillator) -> f32 {
+	increment(oscillator)
+	return saw(oscillator^)
+}
+
+band_limited_saw :: proc(oscillator: Oscillator) -> f32 {
+	y := saw(oscillator)
+	y -= poly_blep(oscillator)
+	return y
+}
+
+next_band_limited_saw :: proc(oscillator: ^Oscillator) -> f32 {
+	increment(oscillator)
+	return band_limited_saw(oscillator^)
+}
+
+triangle :: proc(oscillator: Oscillator) -> f32 {
+	y := -1.0 + (2.0 * f32(oscillator.phase) / 4294967296.0)
+	y = 2.0 * (abs(y) - 0.5)
+	return y
+}
+
+next_triangle :: proc(oscillator: ^Oscillator) -> f32 {
+	increment(oscillator)
+	return triangle(oscillator^)
+}
+
+// Done by integrating the band limited square
+next_band_limited_triangle :: proc(oscillator: ^Oscillator) -> f32 {
+	// Leaky integrator: y[n] = A * x[n] + (1 - A) * y[n-1]
+	mPhaseIncrement := f32(oscillator.phase_increment) / 4294967296.0 * 2 * math.PI
+	x := next_band_limited_square(oscillator)
+	y := mPhaseIncrement * x + (1 - mPhaseIncrement) * oscillator.prev_output
+	oscillator.prev_output = y
+	return y
+}
+
+sine :: proc(oscillator: Oscillator) -> f32 {
+	phase := f32(oscillator.phase) / 4294967296.0 * 2 * math.PI
+	return math.sin(phase)
+}
+
+next_sine :: proc(oscillator: ^Oscillator) -> f32 {
+	increment(oscillator)
+	return sine(oscillator^)
+}
+
+Waveform :: enum {
+	Sine,
+	Saw,
+	Triangle,
+	Square,
+}
+
+WaveformProcs :: [Waveform]proc(oscillator: ^Oscillator) -> f32 {
+	.Sine     = next_sine,
+	.Saw      = next_band_limited_saw,
+	.Triangle = next_band_limited_triangle,
+	.Square   = next_band_limited_square,
+}
+
+
