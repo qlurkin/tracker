@@ -184,7 +184,6 @@ synthesize :: proc(tracker: ^Tracker) -> Frame {
 
 step :: proc(tracker: ^Tracker) {
 	note := tracker.phrase[tracker.cursor.step]
-	fmt.println(note)
 	if note < OFF {
 		queue.push(&tracker.voice_creation_queue, VoiceCreationRequest{note})
 	}

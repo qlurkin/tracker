@@ -270,12 +270,6 @@ ui :: proc(area: rl.Rectangle, tracker: ^Tracker) {
 	label(to_string(len(tracker.voices)))
 	pop_layout()
 
-	// push_layout(Flow.Horizontal)
-	// label("Note", rl.RED, width = 150, alignement = Alignement.Right)
-	// h(DIGIT_WIDTH)
-	// label(note_to_string(tracker.note))
-	// pop_layout()
-
 	push_layout(Flow.Horizontal)
 	label_column()
 	h(5)
