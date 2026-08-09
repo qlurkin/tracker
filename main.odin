@@ -103,7 +103,7 @@ main :: proc() {
 
 	tracker = make_tracker()
 
-	set_note(tracker, 69)
+
 	fmt.println(note_frequency(0))
 	fmt.println(note_frequency(127))
 
@@ -122,6 +122,7 @@ main :: proc() {
 		rl.ClearBackground(rl.BLACK)
 
 		ui(rl.Rectangle{0, 0, f32(window.width), f32(window.height)}, tracker)
+		handle_voice_creation_request(tracker)
 
 		// for i in 32 ..< 72 {
 		// 	rl.DrawText(
@@ -182,6 +183,7 @@ main :: proc() {
 	}
 
 	delete_layout()
+	delete_tracker(tracker)
 
 	ma.device_uninit(&device)
 

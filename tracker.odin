@@ -1,5 +1,6 @@
 package tracker
 
+import "core:container/queue"
 import "core:fmt"
 import "core:math"
 
@@ -16,16 +17,21 @@ Memory :: struct {
 	value: [2]f32,
 }
 
+VoiceCreationRequest :: struct {
+	note: u8,
+}
+
 Tracker :: struct {
-	highpass:        [2]Biquad,
-	lowpass:         [2]Biquad,
-	memory:          Memory,
-	oscillator:      Oscillator,
-	note:            u8,
-	bpm:             u8,
-	phrase:          [16]u8,
-	samples_in_tick: u32,
-	cursor:          PhraseCursor,
+	highpass:             [2]Biquad,
+	lowpass:              [2]Biquad,
+	memory:               Memory,
+	bpm:                  u8,
+	phrase:               [16]u8,
+	samples_in_tick:      u32,
+	cursor:               PhraseCursor,
+	synth:                SimpleSynth,
+	voices:               [dynamic]Voice,
+	voice_creation_queue: queue.Queue(VoiceCreationRequest),
 }
 
 // arg goes between 0 and 1 (from left to right)
@@ -65,22 +71,29 @@ make_highpass :: proc(cutoff: f32) -> Biquad {
 	}
 }
 
-set_note :: proc(tracker: ^Tracker, note: u8) {
-	tracker.note = note
-	set_frequency(&tracker.oscillator, note_frequency(note))
-}
 
 make_tracker :: proc() -> ^Tracker {
 	res := new(Tracker)
-	res.oscillator = make_oscillator()
 	res.highpass[0] = make_highpass(20)
 	res.highpass[1] = res.highpass[0]
 	res.lowpass[0] = make_lowpass(18000)
 	res.lowpass[1] = res.lowpass[0]
 	res.bpm = 128
-	res.phrase = [16]u8{60, 255, 255, 255, 60, 255, 255, 255, 60, 255, 255, 255, 60, 255, 255, 255}
-	set_note(res, 69)
+	res.phrase = [16]u8{16, 255, 255, 255, 16, 255, 255, 255, 16, 255, 255, 255, 16, 255, 255, 255}
+	res.synth = SimpleSynth {
+		attack  = 0.01,
+		decay   = 0.1,
+		sustain = 0.8,
+		release = 2.0,
+		hold    = 0.2,
+	}
+	queue.init(&res.voice_creation_queue)
 	return res
+}
+
+delete_tracker :: proc(tracker: ^Tracker) {
+	delete(tracker.voices)
+	queue.destroy(&tracker.voice_creation_queue)
 }
 
 process_biquad_mono :: proc(bq: ^Biquad, x: f32) -> f32 {
@@ -155,15 +168,26 @@ update_tick :: proc(tracker: ^Tracker) {
 }
 
 synthesize :: proc(tracker: ^Tracker) -> Frame {
+	clean_voices(tracker)
 	update_tick(tracker)
-	s := next_band_limited_square(&tracker.oscillator)
+	s: f32 = 0
+
+	for &voice in tracker.voices {
+		s += next_voice(&voice)
+	}
+
 	f := pan(s, 0.5)
 	f = process(tracker, f)
+
 	return f
 }
 
 step :: proc(tracker: ^Tracker) {
-
+	note := tracker.phrase[tracker.cursor.step]
+	fmt.println(note)
+	if note < OFF {
+		queue.push(&tracker.voice_creation_queue, VoiceCreationRequest{note})
+	}
 }
 
 PhraseCursor :: struct {
@@ -177,9 +201,25 @@ update_phrase_cursor :: proc(tracker: ^Tracker) {
 	if tracker.cursor.tick == tps {
 		tracker.cursor.tick = 0
 		tracker.cursor.step += 1
+		if tracker.cursor.step == 16 {
+			tracker.cursor.step = 0
+		}
+		step(tracker)
 	}
-	if tracker.cursor.step == 16 {
-		tracker.cursor.step = 0
+}
+
+clean_voices :: proc(tracker: ^Tracker) {
+	for i in 0 ..< len(tracker.voices) {
+		if tracker.voices[i].release.transition.value < 0.001 {
+			unordered_remove(&tracker.voices, i)
+			return
+		}
 	}
-	step(tracker)
+}
+
+handle_voice_creation_request :: proc(tracker: ^Tracker) {
+	for queue.len(tracker.voice_creation_queue) > 0 {
+		rq := queue.dequeue(&tracker.voice_creation_queue)
+		append(&tracker.voices, make_voice(&tracker.synth, note_frequency(rq.note)))
+	}
 }
