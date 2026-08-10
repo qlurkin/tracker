@@ -79,14 +79,14 @@ make_tracker :: proc() -> ^Tracker {
 	res.lowpass[0] = make_lowpass(18000)
 	res.lowpass[1] = res.lowpass[0]
 	res.bpm = 128
-	res.phrase = [16]u8{32, 255, 255, 255, 32, 255, 255, 255, 32, 255, 255, 255, 32, 255, 255, 255}
+	res.phrase = [16]u8{31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255}
 	res.synth = SimpleSynth {
-		attack   = 0.01,
-		decay    = 0.1,
-		sustain  = 0.8,
-		release  = 2.0,
-		hold     = 0.2,
-		waveform = Waveform.Saw,
+		attack   = 0.0,
+		decay    = 1.0,
+		sustain  = 0.0,
+		release  = 1.0,
+		hold     = 0.0,
+		waveform = Waveform.Sine,
 	}
 	queue.init(&res.voice_creation_queue)
 	return res

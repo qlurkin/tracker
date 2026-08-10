@@ -54,28 +54,25 @@ next_release :: proc(release: ^Release) -> f32 {
 Ads :: struct {
 	transition:     Transition,
 	attack_samples: u32,
-	decay_coef:     f32,
-	sustain:        f32,
+	//decay_coef:     f32,
+	//sustain:        f32,
 	samples:        u32,
 }
 
 make_ads :: proc(attack_time: f32, decay_time: f32, sustain: f32) -> Ads {
-	attack := duration_to_samples(attack_time)
 	return Ads {
-		transition = Transition{coef = compute_transition_coef(attack), value = 0, target = 1},
-		attack_samples = attack,
-		decay_coef = compute_transition_coef(duration_to_samples(decay_time)),
-		sustain = sustain,
+		transition = make_transition(1, sustain, decay_time),
+		attack_samples = duration_to_samples(attack_time),
 		samples = 0,
 	}
 }
 
 next_ads :: proc(ads: ^Ads) -> f32 {
-	res := next_transition(&ads.transition)
-
-	if ads.samples == ads.attack_samples {
-		ads.transition.coef = ads.decay_coef
-		ads.transition.target = ads.sustain
+	res: f32
+	if ads.samples < ads.attack_samples {
+		res = f32(ads.samples) / f32(ads.attack_samples)
+	} else {
+		res = next_transition(&ads.transition)
 	}
 
 	ads.samples += 1
