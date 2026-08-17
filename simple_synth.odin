@@ -4,121 +4,159 @@ import "core:fmt"
 import "core:math"
 
 Transition :: struct {
-	coef:   f32,
-	value:  f32,
-	target: f32,
+	coef:  Sample,
+	value: Sample,
 }
 
-duration_to_samples :: proc(time: f32) -> u32 {
-	return max(u32(time * f32(SAMPLE_RATE)), 16)
+duration_to_samples :: proc(time: Sample) -> u32 {
+	return max(u32(time * f64(SAMPLE_RATE)), 16)
 }
 
-compute_transition_coef :: proc(samples: u32, eps: f32 = 0.001) -> f32 {
-	return 1 - math.pow(eps, 1 / f32(samples))
+compute_transition_coef :: proc(samples: u32, eps: Sample = 0.001) -> Sample {
+	return 1 - math.pow(eps, 1 / f64(samples))
 }
 
-make_transition :: proc(from: f32, to: f32, time: f32) -> Transition {
-	return Transition {
-		coef = compute_transition_coef(duration_to_samples(time)),
-		value = from,
-		target = to,
-	}
+make_transition :: proc(from: Sample, time: f64) -> Transition {
+	return Transition{coef = compute_transition_coef(duration_to_samples(time)), value = from}
 }
 
 // env = env + (target - env) * coef
-next_transition :: proc(transition: ^Transition) -> f32 {
-	res := transition.value
-	transition.value += (transition.target - transition.value) * transition.coef
-	return res
+next_transition :: proc(transition: ^Transition, target: Sample) -> Sample {
+	transition.value += (target - transition.value) * transition.coef
+	return transition.value
 }
 
 
-Release :: struct {
-	transition: Transition,
-	released:   bool,
+Adsr :: struct {
+	attack:       u32,
+	decay_coef:   Sample,
+	sustain:      Sample,
+	release_coef: Sample,
 }
 
-
-make_release :: proc(time: f32, eps: f32 = 0.001) -> Release {
-	return Release{transition = make_transition(1, 0, time), released = false}
+AdsrInstance :: struct {
+	using adsr: ^Adsr,
+	samples:    u32,
+	value:      Sample,
 }
 
-next_release :: proc(release: ^Release) -> f32 {
-	if release.released {
-		return next_transition(&release.transition)
+make_adsr :: proc(attack: Sample, decay: Sample, sustain: Sample, release: Sample) -> Adsr {
+	return Adsr {
+		attack = duration_to_samples(attack),
+		decay_coef = compute_transition_coef(duration_to_samples(decay)),
+		sustain = sustain,
+		release_coef = compute_transition_coef(duration_to_samples(release)),
+	}
+}
+
+make_adsr_instance :: proc(adsr: ^Adsr) -> AdsrInstance {
+	return AdsrInstance{adsr = adsr}
+}
+
+// env = env + (target - env) * coef
+next_adsr :: proc(adsr: ^AdsrInstance, released: bool = false) -> Sample {
+	res: Sample
+	if adsr.samples < adsr.attack {
+		adsr.value = f64(adsr.samples) / f64(adsr.attack)
 	} else {
-		return 1
-	}
-}
-
-Ads :: struct {
-	transition:     Transition,
-	attack_samples: u32,
-	//decay_coef:     f32,
-	//sustain:        f32,
-	samples:        u32,
-}
-
-make_ads :: proc(attack_time: f32, decay_time: f32, sustain: f32) -> Ads {
-	return Ads {
-		transition = make_transition(1, sustain, decay_time),
-		attack_samples = duration_to_samples(attack_time),
-		samples = 0,
-	}
-}
-
-next_ads :: proc(ads: ^Ads) -> f32 {
-	res: f32
-	if ads.samples < ads.attack_samples {
-		res = f32(ads.samples) / f32(ads.attack_samples)
-	} else {
-		res = next_transition(&ads.transition)
+		target, coef: Sample
+		if released {
+			target = 0
+			coef = adsr.release_coef
+		} else {
+			target = adsr.sustain
+			coef = adsr.decay_coef
+		}
+		adsr.value += (target - adsr.value) * coef
 	}
 
-	ads.samples += 1
+	adsr.samples += 1
+	return adsr.value
+}
+
+ModulatorFunction :: union {
+	Adsr,
+}
+
+ModulatorFunctionInstance :: union {
+	AdsrInstance,
+}
+
+ModulatorDestination :: enum {
+	Off,
+	Volume,
+	Semitone,
+}
+
+ModulatorSettings :: struct {
+	function:    ModulatorFunction,
+	destination: ModulatorDestination,
+}
+
+Modulator :: struct {
+	using settings: ^ModulatorSettings,
+	instance:       ModulatorFunctionInstance,
+}
+
+make_modulator :: proc(settings: ^ModulatorSettings) -> Modulator {
+	res: Modulator
+	switch &f in settings.function {
+	case Adsr:
+		res = Modulator {
+			settings = settings,
+			instance = make_adsr_instance(&f),
+		}
+	}
 	return res
 }
 
 SimpleSynth :: struct {
-	waveform: Waveform,
-	attack:   f32,
-	decay:    f32,
-	sustain:  f32,
-	release:  f32,
-	hold:     f32,
+	waveform:   Waveform,
+	modulators: [2]ModulatorSettings,
 }
 
 Voice :: struct {
 	oscillator: Oscillator,
 	synth:      ^SimpleSynth,
-	ads:        Ads,
-	release:    Release,
-	hold:       u32,
+	modulators: [2]Modulator,
+	volume:     Sample,
+	semitone:   Sample,
+	released:   bool,
 }
 
-make_voice :: proc(synth: ^SimpleSynth, frequency: f32) -> Voice {
+make_voice :: proc(synth: ^SimpleSynth, semitone: Sample, volume: Sample) -> Voice {
 	return Voice {
 		synth = synth,
-		oscillator = make_oscillator(frequency),
-		release = make_release(synth.release),
-		ads = make_ads(synth.attack, synth.decay, synth.sustain),
-		hold = duration_to_samples(synth.hold),
+		oscillator = Oscillator{waveform = synth.waveform},
+		released = false,
+		modulators = [2]Modulator {
+			make_modulator(&synth.modulators[0]),
+			make_modulator(&synth.modulators[1]),
+		},
+		volume = volume,
+		semitone = semitone,
 	}
 }
 
-next_voice :: proc(voice: ^Voice) -> f32 {
-	if voice.ads.samples == voice.hold {
-		voice.release.released = true
-	}
+next_voice :: proc(voice: ^Voice) -> Sample {
+	volume := voice.volume
+	semitone := voice.semitone
 
-	p := WaveformProcs
+	res := next_oscillator(&voice.oscillator, semitone)
 
-	res := 0.25 * p[voice.synth.waveform](&voice.oscillator)
-	env := next_ads(&voice.ads)
-	rel := next_release(&voice.release)
-	return env * res * rel
+	return volume * res
+	// if voice.ads.samples == voice.hold {
+	// 	voice.release.released = true
+	// }
+
+	// p := WaveformProcs
+
+	// res := 0.25 * p[voice.synth.waveform](&voice.oscillator)
+	// env := next_ads(&voice.ads)
+	// rel := next_release(&voice.release)
+	// return env * res * rel
 }
 
 stop_voice :: proc(voice: ^Voice) {
-	voice.release.released = true
+	voice.released = true
 }

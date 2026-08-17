@@ -35,8 +35,8 @@ data_callback :: proc "c" (
 	f: Frame
 	for i in 0 ..< frame_count {
 		f = synthesize(tracker)
-		output[i * 2] = f[0]
-		output[i * 2 + 1] = f[1]
+		output[i * 2] = f32(f[0])
+		output[i * 2 + 1] = f32(f[1])
 	}
 }
 

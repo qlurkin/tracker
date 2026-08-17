@@ -4,17 +4,17 @@ import "core:container/queue"
 import "core:fmt"
 import "core:math"
 
-Frame :: distinct [2]f32
+Frame :: distinct [2]Sample
 
 Biquad :: struct {
-	b0, b1, b2: f32,
-	a1, a2:     f32,
-	x1, x2:     f32,
-	y1, y2:     f32,
+	b0, b1, b2: Sample,
+	a1, a2:     Sample,
+	x1, x2:     Sample,
+	y1, y2:     Sample,
 }
 
 Memory :: struct {
-	value: [2]f32,
+	value: [2]Sample,
 }
 
 VoiceCreationRequest :: struct {
@@ -35,15 +35,15 @@ Tracker :: struct {
 }
 
 // arg goes between 0 and 1 (from left to right)
-pan :: proc(x: f32, arg: f32) -> Frame {
+pan :: proc(x: Sample, arg: Sample) -> Frame {
 	return Frame{x * math.sqrt(1 - arg), x * math.sqrt(arg)}
 }
 
-make_lowpass :: proc(cutoff: f32) -> Biquad {
-	w0 := 2 * math.PI * cutoff / f32(SAMPLE_RATE)
+make_lowpass :: proc(cutoff: Sample) -> Biquad {
+	w0 := 2 * math.PI * cutoff / f64(SAMPLE_RATE)
 	c := math.cos(w0)
 	s := math.sin(w0)
-	a := s * math.sqrt(f32(2)) / 2
+	a := s * math.sqrt(f64(2)) / 2
 	a0 := 1 + a
 
 	return Biquad {
@@ -55,11 +55,11 @@ make_lowpass :: proc(cutoff: f32) -> Biquad {
 	}
 }
 
-make_highpass :: proc(cutoff: f32) -> Biquad {
-	w0 := 2 * math.PI * cutoff / f32(SAMPLE_RATE)
+make_highpass :: proc(cutoff: Sample) -> Biquad {
+	w0 := 2 * math.PI * cutoff / f64(SAMPLE_RATE)
 	c := math.cos(w0)
 	s := math.sin(w0)
-	a := s * math.sqrt(f32(2)) / 2
+	a := s * math.sqrt(f64(2)) / 2
 	a0 := 1 + a
 
 	return Biquad {
@@ -80,13 +80,17 @@ make_tracker :: proc() -> ^Tracker {
 	res.lowpass[1] = res.lowpass[0]
 	res.bpm = 128
 	res.phrase = [16]u8{31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255}
+	// res.synth = SimpleSynth {
+	// 	attack   = 0.0,
+	// 	decay    = 1.0,
+	// 	sustain  = 0.0,
+	// 	release  = 1.0,
+	// 	hold     = 0.0,
+	// 	waveform = Waveform.Sine,
+	// }
 	res.synth = SimpleSynth {
-		attack   = 0.0,
-		decay    = 1.0,
-		sustain  = 0.0,
-		release  = 1.0,
-		hold     = 0.0,
-		waveform = Waveform.Sine,
+		waveform   = .Sine,
+		modulators = [2]ModulatorSettings{},
 	}
 	queue.init(&res.voice_creation_queue)
 	return res
@@ -97,7 +101,7 @@ delete_tracker :: proc(tracker: ^Tracker) {
 	queue.destroy(&tracker.voice_creation_queue)
 }
 
-process_biquad_mono :: proc(bq: ^Biquad, x: f32) -> f32 {
+process_biquad_mono :: proc(bq: ^Biquad, x: Sample) -> Sample {
 	y := bq.b0 * x + bq.b1 * bq.x1 + bq.b2 * bq.x2 - bq.a1 * bq.y1 - bq.a2 * bq.y2
 
 	bq.x2 = bq.x1
@@ -171,7 +175,7 @@ update_tick :: proc(tracker: ^Tracker) {
 synthesize :: proc(tracker: ^Tracker) -> Frame {
 	clean_voices(tracker)
 	update_tick(tracker)
-	s: f32 = 0
+	s: Sample = 0
 
 	for &voice in tracker.voices {
 		s += next_voice(&voice)
@@ -210,7 +214,7 @@ update_phrase_cursor :: proc(tracker: ^Tracker) {
 
 clean_voices :: proc(tracker: ^Tracker) {
 	for i in 0 ..< len(tracker.voices) {
-		if tracker.voices[i].release.transition.value < 0.001 {
+		if tracker.voices[i].released {
 			unordered_remove(&tracker.voices, i)
 			return
 		}
@@ -219,7 +223,10 @@ clean_voices :: proc(tracker: ^Tracker) {
 
 handle_voice_creation_request :: proc(tracker: ^Tracker) {
 	for queue.len(tracker.voice_creation_queue) > 0 {
+		for &voice in tracker.voices {
+			voice.released = true
+		}
 		rq := queue.dequeue(&tracker.voice_creation_queue)
-		append(&tracker.voices, make_voice(&tracker.synth, note_frequency(rq.note)))
+		append(&tracker.voices, make_voice(&tracker.synth, f64(rq.note), 1.0))
 	}
 }
