@@ -89,8 +89,8 @@ make_tracker :: proc() -> ^Tracker {
 	// 	waveform = Waveform.Sine,
 	// }
 	res.synth = SimpleSynth {
-		waveform   = .Sine,
-		modulators = [2]ModulatorSettings{},
+		waveform  = .Sine,
+		functions = [2]ModulatorFunction{make_adsr(0.0, 0.7, 0.0, 0.7), nil},
 	}
 	queue.init(&res.voice_creation_queue)
 	return res
@@ -215,8 +215,15 @@ update_phrase_cursor :: proc(tracker: ^Tracker) {
 clean_voices :: proc(tracker: ^Tracker) {
 	for i in 0 ..< len(tracker.voices) {
 		if tracker.voices[i].released {
-			unordered_remove(&tracker.voices, i)
-			return
+			if tracker.voices[i].modulators[ModulatorDestination.Volume] != nil {
+				if tracker.voices[i].last_volume < 0.001 {
+					unordered_remove(&tracker.voices, i)
+					return
+				}
+			} else {
+				unordered_remove(&tracker.voices, i)
+				return
+			}
 		}
 	}
 }

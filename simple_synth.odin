@@ -78,50 +78,46 @@ ModulatorFunction :: union {
 	Adsr,
 }
 
-ModulatorFunctionInstance :: union {
+Modulator :: union {
 	AdsrInstance,
 }
 
 ModulatorDestination :: enum {
-	Off,
 	Volume,
 	Semitone,
 }
 
-ModulatorSettings :: struct {
-	function:    ModulatorFunction,
-	destination: ModulatorDestination,
-}
-
-Modulator :: struct {
-	using settings: ^ModulatorSettings,
-	instance:       ModulatorFunctionInstance,
-}
-
-make_modulator :: proc(settings: ^ModulatorSettings) -> Modulator {
+make_modulator :: proc(function: ^ModulatorFunction) -> Modulator {
 	res: Modulator
-	switch &f in settings.function {
+	switch &f in function {
 	case Adsr:
-		res = Modulator {
-			settings = settings,
-			instance = make_adsr_instance(&f),
-		}
+		res = make_adsr_instance(&f)
+	}
+	return res
+}
+
+next_modulator :: proc(modulator: ^Modulator, released: bool = false) -> Sample {
+	res: Sample = 1
+	switch &m in modulator {
+	case AdsrInstance:
+		res = next_adsr(&m, released)
 	}
 	return res
 }
 
 SimpleSynth :: struct {
-	waveform:   Waveform,
-	modulators: [2]ModulatorSettings,
+	waveform:  Waveform,
+	functions: [2]ModulatorFunction,
 }
 
 Voice :: struct {
-	oscillator: Oscillator,
-	synth:      ^SimpleSynth,
-	modulators: [2]Modulator,
-	volume:     Sample,
-	semitone:   Sample,
-	released:   bool,
+	oscillator:  Oscillator,
+	synth:       ^SimpleSynth,
+	modulators:  [2]Modulator,
+	volume:      Sample,
+	semitone:    Sample,
+	released:    bool,
+	last_volume: Sample,
 }
 
 make_voice :: proc(synth: ^SimpleSynth, semitone: Sample, volume: Sample) -> Voice {
@@ -130,8 +126,8 @@ make_voice :: proc(synth: ^SimpleSynth, semitone: Sample, volume: Sample) -> Voi
 		oscillator = Oscillator{waveform = synth.waveform},
 		released = false,
 		modulators = [2]Modulator {
-			make_modulator(&synth.modulators[0]),
-			make_modulator(&synth.modulators[1]),
+			make_modulator(&synth.functions[0]),
+			make_modulator(&synth.functions[1]),
 		},
 		volume = volume,
 		semitone = semitone,
@@ -142,8 +138,11 @@ next_voice :: proc(voice: ^Voice) -> Sample {
 	volume := voice.volume
 	semitone := voice.semitone
 
+	volume *= next_modulator(&voice.modulators[ModulatorDestination.Volume], voice.released)
+
 	res := next_oscillator(&voice.oscillator, semitone)
 
+	voice.last_volume = volume
 	return volume * res
 	// if voice.ads.samples == voice.hold {
 	// 	voice.release.released = true
