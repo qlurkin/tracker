@@ -29,8 +29,8 @@ Tracker :: struct {
 	phrase:               [16]u8,
 	samples_in_tick:      u32,
 	cursor:               PhraseCursor,
-	synth:                SimpleSynth,
-	voices:               [dynamic]Voice,
+	synth:                FmSynth,
+	voices:               [dynamic]FmVoice,
 	voice_creation_queue: queue.Queue(VoiceCreationRequest),
 }
 
@@ -79,19 +79,30 @@ make_tracker :: proc() -> ^Tracker {
 	res.lowpass[0] = make_lowpass(18000)
 	res.lowpass[1] = res.lowpass[0]
 	res.bpm = 128
-	res.phrase = [16]u8{31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255}
-	// res.synth = SimpleSynth {
-	// 	attack   = 0.0,
-	// 	decay    = 1.0,
-	// 	sustain  = 0.0,
-	// 	release  = 1.0,
-	// 	hold     = 0.0,
-	// 	waveform = Waveform.Sine,
-	// }
-	res.synth = SimpleSynth {
-		waveform  = .Sine,
-		functions = [2]ModulatorFunction{make_adsr(0.0, 0.7, 0.0, 0.7), nil},
+	res.phrase = [16]u8{255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255, 31, 255, 255, 255, 41}
+
+	res.synth = FmSynth {
+		algorithm = .AandB,
+		operators = [2]Operator {
+			Operator {
+				waveform = .Sine,
+				functions = [4]ModulatorFunction {
+					make_adsr(0.0, 0.4, 0.0, 0.4),
+					make_exp_down(50, 0.05),
+					nil,
+					nil,
+				},
+				ratio = 1.0,
+				level = 1.0,
+			},
+			Operator {
+				waveform = .Noise,
+				functions = [4]ModulatorFunction{make_adsr(0.0, 0.05, 0.0, 0.05), nil, nil, nil},
+				level = 0.5,
+			},
+		},
 	}
+
 	queue.init(&res.voice_creation_queue)
 	return res
 }
@@ -215,12 +226,7 @@ update_phrase_cursor :: proc(tracker: ^Tracker) {
 clean_voices :: proc(tracker: ^Tracker) {
 	for i in 0 ..< len(tracker.voices) {
 		if tracker.voices[i].released {
-			if tracker.voices[i].modulators[ModulatorDestination.Volume] != nil {
-				if tracker.voices[i].last_volume < 0.001 {
-					unordered_remove(&tracker.voices, i)
-					return
-				}
-			} else {
+			if tracker.voices[i].last_level < 0.001 {
 				unordered_remove(&tracker.voices, i)
 				return
 			}

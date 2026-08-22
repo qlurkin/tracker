@@ -2,6 +2,7 @@ package tracker
 
 import "core:fmt"
 import "core:math"
+import "core:math/rand"
 
 Sample :: f64
 
@@ -13,6 +14,7 @@ Waveform :: enum {
 	PolySquare,
 	PolySaw,
 	PolyTriangle,
+	Noise,
 }
 
 // WaveformProcs :: [Waveform]proc(oscillator: ^Oscillator) -> f32 {
@@ -26,6 +28,10 @@ Oscillator :: struct {
 	waveform:    Waveform,
 	phase:       u32,
 	last_output: Sample, // Only used for band limited triangle
+}
+
+noise :: proc() -> Sample {
+	return rand.float64()
 }
 
 square :: proc(phase: u32) -> Sample {
@@ -93,8 +99,7 @@ poly_triangle :: proc(phase: u32, phase_increment: u32, last_output: Sample) -> 
 	return y
 }
 
-next_oscillator :: proc(oscillator: ^Oscillator, semitone: Sample) -> Sample {
-	frequency := 440 * math.pow(2, (semitone - 69) / 12)
+next_oscillator :: proc(oscillator: ^Oscillator, frequency: Sample) -> Sample {
 	phase_increment := u32(frequency * (4294967296 / f64(SAMPLE_RATE)))
 	oscillator.phase += phase_increment
 
@@ -115,6 +120,8 @@ next_oscillator :: proc(oscillator: ^Oscillator, semitone: Sample) -> Sample {
 		res = poly_triangle(oscillator.phase, phase_increment, oscillator.last_output)
 	case .PolySaw:
 		res = poly_saw(oscillator.phase, phase_increment)
+	case .Noise:
+		res = noise()
 	}
 
 	oscillator.last_output = res
